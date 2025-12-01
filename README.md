@@ -51,7 +51,6 @@ amsat/
    git clone <repository_url>
    cd <repository_directory>
 
-
 2. **Create and Activate Virtual Environment:**
    ```bash
    conda env create -f assets/amsat.yml

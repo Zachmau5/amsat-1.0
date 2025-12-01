@@ -1,7 +1,16 @@
 """
-GUI helpers for azimuth/elevation gauges.
+GUI helpers for azimuth and elevation gauges.
 
-These are pure-drawing utilities used by the main tracking GUI.
+Purpose
+-------
+Provide drawing utilities for the polar azimuth compass and the
+elevation gauge used by the tracking GUI.
+
+Role in System
+--------------
+- az_to_compass(): convert azimuth degrees to a 16-point compass label.
+- init_az_compass(ax): draw azimuth polar grid and labels.
+- init_el_gauge(ax): draw elevation gauge (0° horizon, 90° zenith).
 """
 
 import math

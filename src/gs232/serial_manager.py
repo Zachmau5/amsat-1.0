@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-GS-232B Serial Manager (unchanged behavior, just relocated)
+GS-232B Serial Manager.
 
-This wraps pyserial and provides:
-- auto-open across candidate ports
-- basic retries on write failures
-- GS-232B command helpers: send_move(), query_c2()
+Purpose
+-------
+Wrap pyserial to provide:
+  - Auto-open across a list of candidate ports.
+  - Basic retries on write failures.
+  - Convenience methods for GS-232B commands.
+
+Role in System
+--------------
+- Used by main_gs232b.py as the hardware-facing layer.
+- Uses commands.format_move() for W-commands.
 """
 
 from __future__ import annotations
@@ -18,16 +25,29 @@ from gs232.commands import format_move
 
 class SerialManager:
     """
-    Behavior preserved from your inline class:
-      - constructor tries candidates (preferring last_open_port if any)
-      - _open_any() rotates through candidates until one opens
-      - write_cmd() sends with CRLF, optional reply, simple retry on failure
-      - send_move() formats 'Waaa eee' and (optionally) issues C2 echo
-      - query_c2() sends 'C2' and returns a single reply line
+    Simple serial manager for GS-232B.
+
+    Methods
+    -------
+    ensure_open()
+        Ensure that the port is open (reopen if needed).
+    write_cmd(cmd_str, expect_reply=False, retries=1)
+        Send a raw command string plus CR and optionally read a line.
+    send_move(az_deg, el_deg, echo_c2=False)
+        Format and send a W-command; optionally read C2.
+    query_c2()
+        Issue C2 and return the reply.
+    stop()
+        Issue S (all stop).
     """
 
-    def __init__(self, candidates, baud: int = 9600, timeout: float = 1.0):
-        self.candidates = candidates[:]  # list of port names to try
+    def __init__(
+        self,
+        candidates=("/dev/ttyUSB0", "/dev/ttyUSB1", "COM3", "COM4"),
+        baud=9600,
+        timeout=1.0,
+    ):
+        self.candidates = list(candidates)
         self.baud = baud
         self.timeout = timeout
         self.ser: Serial | None = None
@@ -35,6 +55,7 @@ class SerialManager:
         self._open_any()
 
     def _open_any(self) -> bool:
+        """Try last-good port first, then the remaining candidates."""
         ports_to_try = []
         if self.last_open_port:
             ports_to_try.append(self.last_open_port)
@@ -58,8 +79,6 @@ class SerialManager:
                 try:
                     self.ser.reset_input_buffer()
                     self.ser.reset_output_buffer()
-                    # self._write_raw(b"P45\r\n")  # prefer 450° mode (optional)
-                    # _ = self._readline()
                 except Exception:
                     pass
                 print(f"[SER] Opened {p} @ {self.baud} 8N1")
@@ -70,11 +89,13 @@ class SerialManager:
         return False
 
     def ensure_open(self) -> bool:
+        """Return True if the port is open or can be re-opened."""
         if self.ser and self.ser.is_open:
             return True
         return self._open_any()
 
     def close(self) -> None:
+        """Best-effort close of the serial port."""
         try:
             if self.ser:
                 self.ser.close()
@@ -93,12 +114,21 @@ class SerialManager:
         if not self.ensure_open():
             return ""
         try:
-            return self.ser.readline().decode(errors="ignore").strip()
+            b = self.ser.read_until(b"\r")
+            if not b:
+                return ""
+            return b.rstrip(b"\r").decode("ascii", errors="ignore").strip()
         except Exception:
             return ""
 
-    def write_cmd(self, cmd_str: str, expect_reply: bool = False, retries: int = 1) -> str:
-        payload = (cmd_str.rstrip() + "\r\n").encode("ascii", errors="ignore")
+    def write_cmd(self, cmd_str: str, expect_reply=False, retries=1) -> str:
+        """
+        Send 'cmd_str\\r' to the controller and optionally read one reply line.
+        Retries once on SerialException by reopening the port.
+        """
+        cmd_str = cmd_str.rstrip()
+        payload = (cmd_str + "\r").encode("ascii", errors="ignore")
+
         attempt = 0
         while attempt <= retries:
             try:
@@ -108,14 +138,21 @@ class SerialManager:
                 return ""
             except SerialException:
                 self.close()
-                time.sleep(0.2)
+                time.sleep(0.25)
                 self.ensure_open()
                 attempt += 1
         return ""
 
-    def send_move(self, az: float, el: float, echo_c2: bool = True) -> tuple[str, str]:
-        # cmd = f"W{int(round(az)):03d} {int(round(el)):03d}"
-        cmd = format_move(az, el)
+    def send_move(self, az_deg: float, el_deg: float, echo_c2: bool = False):
+        """
+        Format and send a W-command.
+
+        Returns
+        -------
+        (cmd_str, reply_str)
+            reply_str is either empty or the C2 echo if echo_c2=True.
+        """
+        cmd = format_move(az_deg, el_deg)
         reply = ""
         try:
             _ = self.write_cmd(cmd, expect_reply=False, retries=1)
@@ -127,6 +164,7 @@ class SerialManager:
         return cmd, reply
 
     def query_c2(self) -> str:
+        """Send C2 and return the reply."""
         return self.write_cmd("C2", expect_reply=True, retries=1)
 
     def stop(self):

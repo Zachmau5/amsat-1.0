@@ -32,25 +32,25 @@ amsat/
 │ │   └── maps.py
 │ ├── calibration_wizard.py
 │ ├── constants.py
-│ ├── ccoordinate_conversion.py
+│ ├── coordinate_conversion.py
 │ ├── fetch_tle.py
 │ ├── keplerian_parser.py
 │ ├── main_gs232b.py
 │ ├── pass_visibility.py
 │ ├── skyfield_predictor.py
-│ ├── test_pass_visibility.py
-│ └── visibility.py
+│ └── test_pass_visibility.py
+│
 └── README.md
 ```
 
 ### Installation Steps
-> **Note:** Run all setup commands from the repository root.
+> **Note:** Run these commands from the repository root after cloning.
 
-
-1. **Clone the Repository:**
+1. **Clone the Repository**
    ```bash
    git clone <repository_url>
    cd <repository_directory>
+
 
 2. **Create and Activate Virtual Environment:**
    ```bash
@@ -59,7 +59,10 @@ amsat/
 
 3. **Run Tracking Software:**
    ```bash
+   cd src
    python3 main_gs232b.py
+> **Note:** The GUI will start in simulation mode if no GS-232B rotator is detected on a serial port.
+
 ---
 ## Antenna Boresight Wizard
 

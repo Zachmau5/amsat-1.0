@@ -1,47 +1,52 @@
-#
-# from skyfield.api import load
-# from datetime import datetime, timedelta
-#
-# def load_satellite_from_tle(tle_file_path, sat_name="ISS (ZARYA)"):
-#     ts = load.timescale()
-#     with open(tle_file_path, 'r') as f:
-#         lines = f.readlines()
-#     sats = load.tle_file(tle_file_path)
-#     sats_by_name = {sat.name: sat for sat in sats}
-#     return ts, sats_by_name[sat_name]
-#
-# def get_groundtrack(satellite, ts, duration_minutes=90, steps=1000):
-#     now = datetime.utcnow()
-#     times = ts.utc(now.year, now.month, now.day, now.hour, now.minute,
-#                    range(steps))
-#     lats = []
-#     lons = []
-#
-#     for t in times:
-#         geocentric = satellite.at(t)
-#         subpoint = geocentric.subpoint()
-#         lats.append(subpoint.latitude.degrees)
-#         lons.append(subpoint.longitude.degrees)
-#
-#     import numpy as np
-#     return np.column_stack((lons, lats))
+#!/usr/bin/env python3
+"""
+Skyfield-based satellite lookup and pointing helpers.
 
+Purpose
+-------
+Provide small utilities built on top of Skyfield to:
+  - Load and cache TLE files.
+  - Resolve satellites by name or NORAD ID.
+  - Compute azimuth/elevation from a ground station.
+  - Generate simple sub-satellite ground tracks.
+  - Compute azimuth/elevation for multiple satellites at once.
 
-# skyfield_predictor.py
+Role in System
+--------------
+- Consumed by higher-level tools (e.g., tracking GUIs or analysis scripts)
+  that need quick, Skyfield-based pointing and ground-track data.
+- Reads local TLE files and returns Skyfield EarthSatellite objects.
+- Independent of any GUI or GS-232B logic.
+
+High-level Flow (Pseudocode)
+----------------------------
+  1. Create a process-wide Loader and timescale and keep them in module globals.
+  2. Maintain an in-memory cache mapping TLE path -> TLEIndex (sats + lookups).
+  3. When a TLE file is requested:
+       - If cached, return the cached TLEIndex.
+       - Otherwise, load it with Skyfield, build name and NORAD lookups, cache it.
+  4. Expose helpers:
+       - list_satellites(tle_path): list display names.
+       - get_satellite(tle_path, key): resolve by normalized name or NORAD.
+       - az_el_at(sat, lat, lon, elev, when): compute (az, el, range_km).
+       - groundtrack(sat, start, minutes, step_s): compute lons/lats along track.
+       - multi_az_el(sats, lat, lon, elev, when): az/el for multiple sats at once.
+       - n2yo_style_debug(...): optional diagnostic print helper.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from skyfield.api import EarthSatellite, Loader, wgs84
 
-# One loader for everything (puts ephemeris cache under ./skyfield-data)
-# If you'd rather keep it elsewhere, change the path below.
+# Single Loader instance; ephemeris cache is stored under ./skyfield-data.
 _sky_loader = Loader("./skyfield-data")
 _ts = _sky_loader.timescale()
 
-# In-memory cache so we only parse a TLE file once per process
+# In-memory cache so each TLE file is only parsed once per process.
 _TLE_CACHE: Dict[str, "TLEIndex"] = {}
 
 
@@ -61,8 +66,12 @@ class TLEIndex:
 def load_tle_index(tle_path: str) -> TLEIndex:
     """
     Load and index satellites from a TLE file.
-    - Index by normalized .name and by NORAD catalog number (string).
-    - Cached for re-use.
+
+    Indexing:
+      - by normalized .name (spaces removed, upper-case).
+      - by NORAD catalog number (string).
+
+    Instances are cached per-process by path so repeated calls are inexpensive.
     """
     global _TLE_CACHE
     if tle_path in _TLE_CACHE:
@@ -101,8 +110,10 @@ def get_satellite(
     Retrieve a satellite by:
       - exact/loose name (case/space-insensitive), or
       - NORAD catalog number (string or int).
+
     If allow_prefix is True, a unique prefix of the name will match.
-    Raises ValueError if no unique match.
+
+    Raises ValueError if no unique match is found.
     """
     idx = load_tle_index(tle_path)
     k = str(key).strip()
@@ -151,8 +162,11 @@ def az_el_at(
     when: Optional[datetime] = None,
 ) -> Tuple[float, float, float]:
     """
-    Compute (az_deg, el_deg, range_km) from given ground site to satellite at time 'when'.
-    - 'when' in UTC (naive datetimes are assumed UTC).
+    Compute (az_deg, el_deg, range_km) from a ground site to a satellite at time 'when'.
+
+    Datetime handling:
+      - If 'when' is None, current UTC is used.
+      - If 'when' is naive, it is interpreted as UTC.
     """
     if when is None:
         when = datetime.now(timezone.utc)
@@ -174,10 +188,22 @@ def groundtrack(
 ) -> Tuple[List[float], List[float]]:
     """
     Compute a simple sub-satellite ground track.
-      - start: UTC datetime (naive treated as UTC). Defaults now().
-      - minutes: total duration
-      - step_s: time step in seconds
-    Returns (lons_deg, lats_deg).
+
+    Parameters
+    ----------
+    sat : EarthSatellite
+        Skyfield satellite object.
+    start : datetime, optional
+        Start time in UTC (naive treated as UTC). Defaults to now.
+    minutes : int
+        Total duration of the track.
+    step_s : int
+        Time step in seconds.
+
+    Returns
+    -------
+    (lons_deg, lats_deg) : list of float
+        Lists of longitudes and latitudes along the ground track.
     """
     if start is None:
         start = datetime.now(timezone.utc)
@@ -186,12 +212,12 @@ def groundtrack(
 
     steps = max(1, int((minutes * 60) // step_s))
     times = _ts.utc(
-        [ (start + timedelta(seconds=i * step_s)).year   for i in range(steps) ],
-        [ (start + timedelta(seconds=i * step_s)).month  for i in range(steps) ],
-        [ (start + timedelta(seconds=i * step_s)).day    for i in range(steps) ],
-        [ (start + timedelta(seconds=i * step_s)).hour   for i in range(steps) ],
-        [ (start + timedelta(seconds=i * step_s)).minute for i in range(steps) ],
-        [ (start + timedelta(seconds=i * step_s)).second for i in range(steps) ],
+        [(start + timedelta(seconds=i * step_s)).year for i in range(steps)],
+        [(start + timedelta(seconds=i * step_s)).month for i in range(steps)],
+        [(start + timedelta(seconds=i * step_s)).day for i in range(steps)],
+        [(start + timedelta(seconds=i * step_s)).hour for i in range(steps)],
+        [(start + timedelta(seconds=i * step_s)).minute for i in range(steps)],
+        [(start + timedelta(seconds=i * step_s)).second for i in range(steps)],
     )
 
     lons: List[float] = []
@@ -211,7 +237,9 @@ def multi_az_el(
     when: Optional[datetime] = None,
 ) -> Dict[str, Tuple[float, float, float]]:
     """
-    Vector helper: for an iterable of EarthSatellite objects, return a dict:
+    Vector helper for an iterable of EarthSatellite objects.
+
+    Returns a mapping:
         {sat.name: (az_deg, el_deg, range_km)}
     """
     if when is None:
@@ -228,9 +256,12 @@ def multi_az_el(
         results[sat.name] = (az.degrees % 360.0, alt.degrees, distance.km)
     return results
 
+
 def n2yo_style_debug(sat, ts, when=None):
     """
-    Print N2YO-style summary for a given Skyfield EarthSatellite.
+    Print an N2YO-style summary for a given Skyfield EarthSatellite.
+
+    This is a diagnostic helper for manual comparison against online trackers.
     """
     if when is None:
         when = datetime.now(timezone.utc)
@@ -248,4 +279,5 @@ def n2yo_style_debug(sat, ts, when=None):
 
     # Velocity vector and speed
     vel = geocentric.velocity.km_per_s  # (vx, vy, vz)
-    speed_km_s = (vel[0]**2 + vel[1]**2 + vel[2]**2) ** 0.5
+    speed_km_s = (vel[0] ** 2 + vel[1] ** 2 + vel[2] ** 2) ** 0.5
+    # Caller can log or print these values as needed.

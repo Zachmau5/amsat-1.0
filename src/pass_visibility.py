@@ -1,14 +1,34 @@
 #!/usr/bin/env python3
 """
-pass_visibility.py
+Precompute elevation-based visibility windows for satellites in a TLE file.
 
-Precompute elevation-based visibility passes for all satellites in a TLE file.
+Purpose
+-------
+Provide a lightweight, discrete-time pass predictor that answers:
+  - Which satellites in a TLE file have a pass in the next N minutes?
+  - For each pass: when does it start, reach peak elevation, and end?
 
-This is for PLANNING / METADATA only:
-  - "Which sats have a pass in the next N minutes?"
-  - "When does the pass start/peak/end?"
+Role in System
+--------------
+- Consumed by the main GUI (main_gs232b.py) to:
+    - Annotate satellites with "[HH:MM @ XX°]" next-pass information.
+    - Highlight satellites that have at least one upcoming pass.
+- Independent of Skyfield-based continuous pointing; this module does not
+  replace the live ~600 ms pointing loop.
 
-It does NOT replace the live 600 ms pointing loop.
+High-level Flow (Pseudocode)
+----------------------------
+  1. Read the TLE file as simple 3-line blocks: (name, line1, line2).
+  2. For each satellite:
+       a. Build a Skyfield EarthSatellite instance.
+       b. Step from (now - look_back) to (now + window_minutes) in dt_sec increments.
+       c. At each step:
+            - Compute topocentric elevation at the ground station.
+            - Enter/extend a pass while elevation >= min_el_deg.
+            - On exit, store PassInterval(start, peak, end, max_el_deg).
+       d. Handle the edge case of being mid-pass at the end of the window.
+  3. Filter passes so that only passes whose peak time is >= now are kept.
+  4. Return a mapping from satellite name to SatPassSummary.
 """
 
 from __future__ import annotations
@@ -19,13 +39,13 @@ from typing import Dict, List, Optional, Tuple
 
 from skyfield.api import load, wgs84, EarthSatellite
 
-# Use a local timescale; no dependency on skyfield_predictor here
+# Local timescale for this module.
 _ts = load.timescale()
 
 
 @dataclass
 class PassInterval:
-    """One continuous interval with elevation above min_el_deg."""
+    """Single continuous interval with elevation above min_el_deg."""
     start: datetime
     peak: datetime
     end: datetime
@@ -151,22 +171,22 @@ def compute_pass_visibility_for_file(
     tle_path: str,
     my_lat: float,
     my_lon: float,
-    window_minutes: float = 30.0,
-    min_el_deg: float = 20.0,
-    dt_sec: float = 20.0,
-    look_back_minutes: float = 5.0,   # NEW: how far into the past we scan
+    window_minutes: float = 15.0,
+    min_el_deg: float = 10.0,
+    dt_sec: float = 60.0,
+    look_back_minutes: float = 1.0,
 ) -> Dict[str, SatPassSummary]:
     """
     For all satellites in the TLE file at `tle_path`, compute visibility
     passes above `min_el_deg` elevation over a window that starts a bit
     before 'now' and extends into the future.
 
-    Only passes whose PEAK time is >= now are kept, so passes that have
-    already gone overhead and are descending do NOT count.
+    Only passes whose peak time is >= now are kept, so passes that have
+    already peaked do not contribute.
     """
     now = datetime.now(timezone.utc)
 
-    # Look slightly into the past so we see full passes and their true peaks
+    # Look slightly into the past so full passes (including true peaks) are captured.
     start_dt = now - timedelta(minutes=look_back_minutes)
     end_dt = now + timedelta(minutes=window_minutes)
 
@@ -176,7 +196,6 @@ def compute_pass_visibility_for_file(
     for name, l1, l2 in tle_blocks:
         sat = EarthSatellite(l1, l2, name, _ts)
 
-        # Compute all passes in the extended window
         all_passes = _compute_passes_for_sat(
             sat=sat,
             my_lat=my_lat,
@@ -187,7 +206,6 @@ def compute_pass_visibility_for_file(
             min_el_deg=min_el_deg,
         )
 
-        # Keep only passes whose PEAK is in the future (or right now)
         future_passes = [p for p in all_passes if p.peak >= now]
 
         summaries[name] = SatPassSummary(
@@ -196,6 +214,3 @@ def compute_pass_visibility_for_file(
         )
 
     return summaries
-
-
-

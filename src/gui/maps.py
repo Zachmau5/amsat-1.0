@@ -2,36 +2,45 @@
 """
 GUI helpers for Basemap-based global and near-sided (QTH-centered) maps.
 
-These functions are thin wrappers around your existing map setup so that
-main_gs232b.py stays focused on tracking logic instead of cartography details.
-"""
+Purpose
+-------
+Factor out Basemap setup and drawing so that the main tracking code
+(main_gs232b.py) can focus on control logic instead of cartography.
 
+Role in System
+--------------
+- create_maps(): builds and initializes two Basemap instances:
+    - A global map.
+    - A near-sided view centered on the ground station.
+- draw_nearsided_background(): refreshes the near-sided map background
+  between animation frames (coasts, graticule, QTH marker, etc.).
+
+High-level Flow (Pseudocode)
+----------------------------
+  1. create_maps(ax_global, ax_near, my_lat, my_lon):
+       - Create a global “mill” projection bound to ax_global.
+       - Draw boundaries, continents, coasts, and QTH marker.
+       - Create a near-sided nsper projection centered at QTH bound to ax_near.
+       - Draw a dark background and QTH marker.
+       - Return (map_global, map_near).
+  2. draw_nearsided_background(map_near, ax_near, my_lat, my_lon):
+       - Clear and redraw the near-sided view:
+           * Oceans, continents, coasts.
+           * Graticule.
+           * QTH marker and label.
+"""
 from mpl_toolkits.basemap import Basemap
 
 
 def create_maps(ax_global, ax_near, my_lat, my_lon):
     """
-    Create and initialize the two Basemap instances:
-
-      - map_global: global 'mill' projection
-      - map_near:   near-sided perspective centered on QTH
-
-    Also draws the static 'Me' marker on the global map.
-
-    Parameters
-    ----------
-    ax_global : matplotlib Axes
-        Axes for the global view.
-    ax_near : matplotlib Axes
-        Axes for the near-sided (QTH-centered) view.
-    my_lat, my_lon : float
-        Ground-station latitude/longitude in degrees.
+    Create and initialize the two Basemap instances.
 
     Returns
     -------
-    (map_global, map_near) : tuple of Basemap
+    (map_global, map_near) : tuple[Basemap, Basemap]
     """
-    # Global map (same as before)
+    # Global map
     map_global = Basemap(
         projection="mill",
         llcrnrlat=-90,
@@ -57,7 +66,7 @@ def create_maps(ax_global, ax_near, my_lat, my_lon):
         color="black",
     )
 
-    # Near-sided (nsper) map (same params as before)
+    # Near-sided (nsper) map
     map_near = Basemap(
         projection="nsper",
         lon_0=my_lon,

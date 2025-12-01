@@ -1,32 +1,44 @@
 #!/usr/bin/env python3
 """
-GS-232B Calibration Wizard for Antenna Pointing Bringup (UI helper for main_gs232b.py)
---------------------------------------------------------------------------------------
-Author: Zach Hallett
+GS-232B Calibration Wizard for Antenna Pointing Bring-up.
 
 Purpose
 -------
-A lightweight Tk/Tkinter wizard I can run before the main tracking GUI to:
+Provide a small Tk-based wizard to:
   1) Drive the array to known reference headings (North/South) to verify
-     physical vs. “software” north alignment.
-  2) Optionally park (stage) the array at a preset azimuth before exiting.
-  3) Return control to the main app (satellite selection / tracking).
+     physical vs. software north alignment.
+  2) Optionally park (stage) the array at a preset azimuth before exit.
+  3) Hand control back to the main tracking application.
 
-Design notes
-------------
-- Decoupled from main so I can run it standalone or embedded in the main Tk root.
-- Serial is minimal and intended to be compatible with my existing SerialManager.
-- Includes a no-hardware “Simulate” mode for bench testing or demos.
+Role in System
+--------------
+- Can be launched standalone for bench testing, or invoked from the main GUI.
+- Uses a minimal SerialManager wrapper that supports:
+    - Real GS-232B hardware on common ports.
+    - A simulation mode for environments without hardware.
+- Issues only simple commands (W, S, C2); no persistent controller offsets.
 
-Commands used (quick ref)
--------------------------
-Wxxx yyy  -> absolute move (az=xxx, el=yyy)
-S         -> all stop (both axes)
-C2        -> position echo
-
-This is NOT a hard calibration tool (no F/O/offset commands). It’s a bring-up
-sequence to verify headings and ensure the system behaves as expected.
+High-level Flow (Pseudocode)
+----------------------------
+  1. SerialManager:
+       - On init: optionally open one of several candidate ports; or enter
+         simulate mode.
+       - write_cmd(): send commands with retries; optionally read a reply.
+       - send_move(): clamp/format az/el into Waaa eee; optionally issue C2.
+       - stop() / c2(): convenience helpers.
+  2. WizardFrame (Tk.Frame):
+       - Splash page: safety blurb, Start / Cancel.
+       - Step 1 (North): issue W000 000; operator visually confirms north.
+       - Step 2 (South): issue W180 000; operator visually confirms south.
+       - Stage page: choose preset azimuth (every 15°) and move there.
+       - Complete page: Exit / Restart / Cancel options.
+       - Periodically poll C2 and display the latest az/el.
+  3. run_wizard(root, ser_mgr):
+       - Replace existing root contents with WizardFrame.
+       - Wait until on_complete() sets a flag.
+       - Return a boolean success indicator to the caller.
 """
+
 import time
 import threading
 import tkinter as tk
@@ -38,7 +50,7 @@ import tkinter.font as tkfont
 try:
     import serial
     from serial import Serial, SerialException
-except Exception:  # allow import in environments without pyserial for quick UI tests
+except Exception:  # allow import in environments without pyserial
     serial = None
     Serial = None
 
@@ -50,7 +62,7 @@ except Exception:  # allow import in environments without pyserial for quick UI 
 # Modern-ish font selection
 # =========================
 def _pick_ui_font():
-    """Try to use a clean UI font; fall back to TkDefaultFont if unavailable."""
+    """Select a clean UI font if available; otherwise use TkDefaultFont."""
     try:
         fams = set(tkfont.families())
         for f in ("Segoe UI", "Noto Sans", "DejaVu Sans", "Cantarell", "Roboto", "Arial"):
@@ -64,7 +76,6 @@ def _pick_ui_font():
 # =========================
 # C2 parser (shared helper)
 # =========================
-# Accept typical C2 variants like '+0180+0090', ' 180 090', '0180,090', etc.
 _C2_RE = re.compile(
     r"AZ\s*[:=]\s*([+\-]?\d{1,4})\D+EL\s*[:=]\s*([+\-]?\d{1,3})",
     re.IGNORECASE,
@@ -75,9 +86,6 @@ def parse_c2_az_el(reply: str):
     """
     Parse GS-232B C2 reply into (az, el) integer degrees.
     Returns (None, None) on failure.
-
-    Clamp az ∈ [0, 450] and el ∈ [0, 180] to keep values sane and avoid
-    weirdness when a controller supports >360° wrap.
     """
     if not reply:
         return (None, None)
@@ -105,12 +113,11 @@ class SerialManager:
       - send_move(az, el) -> sends Wxxx yyy.
       - c2() -> sends C2 and returns one line (or simulated line).
 
-    Sim mode
-    --------
-    - If simulate=True is passed, no serial ports are opened and commands are
-      just tracked internally.
-    - If simulate=False but pyserial is missing or no ports open, we fall back
-      to simulate=True automatically.
+    Simulation mode:
+      - If simulate=True, no ports are opened and commands are tracked
+        internally.
+      - If simulate=False but no ports open, the manager falls back to
+        simulate=True automatically.
     """
 
     def __init__(

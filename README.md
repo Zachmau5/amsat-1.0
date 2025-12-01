@@ -37,9 +37,7 @@ amsat/
 │ ├── keplerian_parser.py
 │ ├── main_gs232b.py
 │ ├── pass_visibility.py
-│ ├── skyfield_predictor.py
-│ └── test_pass_visibility.py
-│
+│ └── skyfield_predictor.py
 └── README.md
 ```
 

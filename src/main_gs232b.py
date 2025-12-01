@@ -248,7 +248,7 @@ def runPredictionTool(checkbox_dict, tle_dict, my_lat, my_lon, tle_path):
     # ────────────────────────────────────────────────────────────────────
     # Anti-jitter parameters
     AZ_DEADBAND_DEG = 2.0
-    EL_DEADBAND_DEG = 1.5
+    EL_DEADBAND_DEG = 1.0
     MIN_INTERVAL_S = 1.0
     AZ_SLEW_DEG_PER_S = 8.0
     EL_SLEW_DEG_PER_S = 6.0

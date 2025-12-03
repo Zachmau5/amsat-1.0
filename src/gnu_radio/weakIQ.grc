@@ -1,0 +1,1038 @@
+options:
+  parameters:
+    author: joshb
+    catch_exceptions: 'True'
+    category: '[GRC Hier Blocks]'
+    cmake_opt: ''
+    comment: ''
+    copyright: ''
+    description: This flowgraph has by custom DBPSK block and custom hard_viterbi_pdu
+      block which is an embedded python implementation
+    gen_cmake: 'On'
+    gen_linking: dynamic
+    generate_options: qt_gui
+    hier_block_src_path: '.:'
+    id: weakIQ
+    max_nouts: '0'
+    output_language: python
+    placement: (0,0)
+    qt_qss_theme: ''
+    realtime_scheduling: ''
+    run: 'True'
+    run_command: '{python} -u {filename}'
+    run_options: prompt
+    sizing_mode: fixed
+    thread_safe_setters: ''
+    title: Funcube Demod and Decode Chain
+    window_size: (1000,1000)
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [8, 8]
+    rotation: 0
+    state: enabled
+
+blocks:
+- name: samp_rate
+  id: variable
+  parameters:
+    comment: ''
+    value: 96e3
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [768, 248.0]
+    rotation: 0
+    state: enabled
+- name: viterbi
+  id: variable_cc_decoder_def
+  parameters:
+    comment: ''
+    dim1: '1'
+    dim2: '1'
+    framebits: '5132'
+    k: '7'
+    mode: fec.CC_TERMINATED
+    ndim: '0'
+    padding: 'False'
+    polys: '[79,-109]'
+    rate: '2'
+    state_end: '-1'
+    state_start: '0'
+    value: '"ok"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1440, 652.0]
+    rotation: 0
+    state: enabled
+- name: blocks_float_to_complex_0
+  id: blocks_float_to_complex
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [528, 336.0]
+    rotation: 0
+    state: enabled
+- name: blocks_message_debug_1
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    en_uvec: 'True'
+    log_level: info
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [3016, 856.0]
+    rotation: 0
+    state: disabled
+- name: blocks_message_debug_1_0
+  id: blocks_message_debug
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    en_uvec: 'True'
+    log_level: info
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1928, 856.0]
+    rotation: 0
+    state: enabled
+- name: blocks_throttle2_0
+  id: blocks_throttle2
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    ignoretag: 'True'
+    limit: auto
+    maximum: '0.1'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samples_per_second: samp_rate
+    type: complex
+    vlen: '1'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [752, 336.0]
+    rotation: 0
+    state: enabled
+- name: blocks_wavfile_source_0
+  id: blocks_wavfile_source
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    file: C:\Users\joshb\OneDrive\Documents\funcube recordings\EMrecording3_weak_20131005_161728Z_145942kHz_IQ.wav
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    nchan: '2'
+    repeat: 'True'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [272, 336.0]
+    rotation: 0
+    state: enabled
+- name: digital_fll_band_edge_cc_0
+  id: digital_fll_band_edge_cc
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    filter_size: '100'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    rolloff: '0.35'
+    samps_per_sym: '10'
+    type: cc
+    w: '0.001'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [864, 464.0]
+    rotation: 0
+    state: enabled
+- name: digital_symbol_sync_xx_0
+  id: digital_symbol_sync_xx
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    constellation: digital.constellation_bpsk().base()
+    damping: '1.0'
+    loop_bw: '0.045'
+    max_dev: '1.5'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    nfilters: '32'
+    osps: '1'
+    pfb_mf_taps: firdes.root_raised_cosine(16, 16, 1.0/10.0, 0.35, 32*80)
+    resamp_type: digital.IR_PFB_MF
+    sps: '10'
+    ted_gain: '1.0'
+    ted_type: digital.TED_SIGNAL_TIMES_SLOPE_ML
+    type: cc
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1144, 508.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_0
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nHard-decision CCSDS K=7 Viterbi decoder as an Embedded\
+      \ Python PDU block.\n\nInput:\n    PDU containing float32 soft symbols from\
+      \ matrix_deinterleaver_soft\nOutput:\n    PDU containing uint8 bytes (one decoded\
+      \ bit per byte)\n\"\"\"\n\nimport numpy as np\nfrom gnuradio import gr\nimport\
+      \ pmt\n\n# ============================================================\n# Convolutional\
+      \ code parameters: CCSDS K=7, r = 1/2\n# Generators: 171(octal), 133(octal)\n\
+      # GNU Radio uses bit-reversed polynomials: 79, -109\n# ============================================================\n\
+      \nK = 7\nMEM = K - 1\nNUM_STATES = 2 ** MEM  # 64 states\n\n# Precompute next_state\
+      \ and encoder output for each state and input bit\nnext_state = np.zeros((NUM_STATES,\
+      \ 2), dtype=int)\nout_table = np.zeros((NUM_STATES, 2, 2), dtype=int)  # [state][bit]\
+      \ -> [e0, e1]\n\n# Bit-reversed CCSDS polynomials in decimal, exactly as cc_decoder\
+      \ uses\nPOLY0 = 79     # 0b1001111 (reversed 171o)\nPOLY1 = -109   # 0b1101101\
+      \ (reversed 133o, sign = inversion)\n\ndef parity(x: int) -> int:\n    \"\"\"\
+      Return parity (0/1) of integer x.\"\"\"\n    return bin(x).count(\"1\") & 1\n\
+      \n# Build trellis tables to match gr::fec::code::cc_decoder\nfor s in range(NUM_STATES):\n\
+      \    for bit in (0, 1):\n        # 7-bit shift register, NEW BIT IN LSB (matches\
+      \ 2*state logic)\n        # reg = [d_{n-6} ... d_{n-1}, bit]\n        reg =\
+      \ ((s << 1) | bit) & 0x7F\n\n        # Generator 0 output\n        e0 = parity(reg\
+      \ & abs(POLY0))\n        if POLY0 < 0:\n            e0 ^= 1\n\n        # Generator\
+      \ 1 output\n        e1 = parity(reg & abs(POLY1))\n        if POLY1 < 0:\n \
+      \           e1 ^= 1\n\n        out_table[s, bit] = [e0, e1]\n\n        # Next\
+      \ state = drop oldest bit d_{n-6}, keep [d_{n-5} ... d_n]\n        next_s =\
+      \ reg & 0x3F\n        next_state[s, bit] = next_s\n\n\n\n# ============================================================\n\
+      # Viterbi Decoder (hard decision)\n# ============================================================\n\
+      \ndef viterbi_decode_k7_ccsds(encoded_bits: np.ndarray) -> np.ndarray:\n   \
+      \ \"\"\"\n    Hard-decision Viterbi for CCSDS K=7, r=1/2.\n\n    encoded_bits\
+      \ : 1D numpy array of 0/1 ints, even length\n    returns      : decoded 0/1\
+      \ bits (INCLUDING the 6 tail bits)\n    \"\"\"\n    encoded_bits = np.array(encoded_bits,\
+      \ dtype=np.uint8)\n    num_steps = len(encoded_bits) // 2\n\n    metrics = np.full((num_steps,\
+      \ NUM_STATES), np.inf)\n    prev_state = np.zeros((num_steps, NUM_STATES), dtype=int)\n\
+      \    prev_bit = np.zeros((num_steps, NUM_STATES), dtype=int)\n\n    # Initial\
+      \ path metrics: known start state 0 (terminated mode)\n    prev_metrics = np.full(NUM_STATES,\
+      \ np.inf)\n    prev_metrics[0] = 0.0\n\n    # Forward recursion\n    for t in\
+      \ range(num_steps):\n        r0 = int(encoded_bits[2 * t])\n        r1 = int(encoded_bits[2\
+      \ * t + 1])\n        metrics[t, :] = np.inf\n\n        for s_prev in range(NUM_STATES):\n\
+      \            m_prev = prev_metrics[s_prev]\n            if np.isinf(m_prev):\n\
+      \                continue\n\n            for bit in (0, 1):\n              \
+      \  e0, e1 = out_table[s_prev, bit]\n                # Hamming distance branch\
+      \ metric\n                branch = (r0 != e0) + (r1 != e1)\n\n             \
+      \   s_next = next_state[s_prev, bit]\n                cand = m_prev + branch\n\
+      \n                if cand < metrics[t, s_next]:\n                    metrics[t,\
+      \ s_next] = cand\n                    prev_state[t, s_next] = s_prev\n     \
+      \               prev_bit[t, s_next] = bit\n\n        prev_metrics = metrics[t]\n\
+      \n    # Traceback: choose best final state (end_state = -1 behavior)\n    state\
+      \ = int(np.argmin(prev_metrics))\n    decoded_rev = []\n\n    for t in range(num_steps\
+      \ - 1, -1, -1):\n        bit = prev_bit[t, state]\n        decoded_rev.append(bit)\n\
+      \        state = prev_state[t, state]\n\n    decoded = decoded_rev[::-1]\n \
+      \   return np.array(decoded, dtype=np.uint8)\n\n\n# ============================================================\n\
+      # Embedded Python PDU block\n# ============================================================\n\
+      \nclass blk(gr.basic_block):\n    \"\"\"\n    hard_viterbi_pdu\n\n    Input:\
+      \  PDU with f32vector of soft symbols (matrix_deinterleaver_soft output)\n \
+      \   Output: PDU with u8vector of decoded bits (0/1 per byte, tail bits removed)\n\
+      \    \"\"\"\n\n    def __init__(self):\n        gr.basic_block.__init__(\n \
+      \           self,\n            name=\"hard_viterbi_pdu\",\n            in_sig=None,\n\
+      \            out_sig=None,\n        )\n\n        # Message ports\n        self.message_port_register_in(pmt.intern(\"\
+      in\"))\n        self.set_msg_handler(pmt.intern(\"in\"), self.handle_msg)\n\n\
+      \        self.message_port_register_out(pmt.intern(\"out\"))\n\n    def handle_msg(self,\
+      \ msg):\n        # Extract PDU\n        meta = pmt.car(msg)\n        vec = pmt.cdr(msg)\n\
+      \n        # 1) Extract float soft symbols\n        soft = np.array(pmt.f32vector_elements(vec),\
+      \ dtype=np.float32)\n\n        # 2) Convert soft symbols \u2192 hard bits (0\
+      \ or 1)\n        bits = (soft >= 0.0).astype(np.uint8)\n\n        # 3) Run hard-decision\
+      \ Viterbi\n        decoded_bits = viterbi_decode_k7_ccsds(bits)\n        # decoded_bits\
+      \ length \u2248 2566 (2560 info + 6 tail)\n\n        # 4) Remove the 6 encoder\
+      \ tail bits (K\u22121 = 6)\n        decoded_no_tail = decoded_bits[:-6]\n\n\
+      \        # 5) Take exactly 2560 info bits (no offset for noiseless test)\n \
+      \       FRAME_INFO_BITS = 2560\n        info_bits = decoded_no_tail[:FRAME_INFO_BITS]\n\
+      \n        # Safety fallback\n        if len(info_bits) > FRAME_INFO_BITS:\n\
+      \            info_bits = info_bits[:FRAME_INFO_BITS]\n\n        # 6) Build output\
+      \ PDU with 1 byte per bit\n        out_vec = pmt.init_u8vector(len(info_bits),\
+      \ info_bits.tolist())\n        out_pdu = pmt.cons(pmt.PMT_NIL, out_vec)\n\n\
+      \        # 7) Publish\n        self.message_port_pub(pmt.intern(\"out\"), out_pdu)\n"
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    _io_cache: '(''hard_viterbi_pdu'', ''blk'', [], [(''in'', ''message'', 1)], [(''out'',
+      ''message'', 1)], ''\n    hard_viterbi_pdu\n\n    Input:  PDU with f32vector
+      of soft symbols (matrix_deinterleaver_soft output)\n    Output: PDU with u8vector
+      of decoded bits (0/1 per byte, tail bits removed)\n    '', [])'
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1120, 888.0]
+    rotation: 0
+    state: enabled
+- name: epy_block_1
+  id: epy_block
+  parameters:
+    _source_code: "\"\"\"\nEmbedded Python Blocks:\n\nThis block implements:\n   \
+      \ prev = x[n-1]       (1-sample delay)\n    z[n] = x[n] * conj(prev)\n    y[n]\
+      \ = Re{ z[n] }\n\nSo it is equivalent to:\n    [complex in] -> Delay(1) & direct\
+      \ path -> Multiply Conjugate -> Complex to Real\n\"\"\"\n\nimport numpy as np\n\
+      from gnuradio import gr\n\n\nclass blk(gr.sync_block):\n    \"\"\"Delay-1, Multiply-Conjugate,\
+      \ and Real-part in one block\"\"\"\n\n    def __init__(self):\n        gr.sync_block.__init__(\n\
+      \            self,\n            name='DBPSK Demod',   # name shown in GRC\n\
+      \            in_sig=[np.complex64],\n            out_sig=[np.float32]      \
+      \     # Complex to Real result\n        )\n\n        # Internal state: previous\
+      \ sample for the 1-sample delay\n        self.prev = np.complex64(0.0 + 0.0j)\n\
+      \n    def work(self, input_items, output_items):\n        x = input_items[0]\
+      \           # complex input vector\n        y = output_items[0]          # real\
+      \ output vector\n        n = len(x)\n\n        # Build array of \"delayed\"\
+      \ samples: [prev, x[0], x[1], ..., x[n-2]]\n        delayed = np.empty_like(x)\n\
+      \        delayed[0] = self.prev\n        delayed[1:] = x[:-1]\n\n        # Multiply\
+      \ by conjugate of delayed signal and take real part\n        y[:] = np.real(x\
+      \ * np.conj(delayed))\n\n        # Update state for next call\n        self.prev\
+      \ = x[-1]\n\n        return n\n"
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    _io_cache: ('DBPSK Demod', 'blk', [], [('0', 'complex', 1)], [('0', 'float', 1)],
+      'Delay-1, Multiply-Conjugate, and Real-part in one block', [])
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [656, 736.0]
+    rotation: 0
+    state: enabled
+- name: freq_xlating_fir_filter_xxx_0_0
+  id: freq_xlating_fir_filter_xxx
+  parameters:
+    affinity: ''
+    alias: ''
+    center_freq: 16.58e3
+    comment: ''
+    decim: '8'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    samp_rate: samp_rate
+    taps: firdes.low_pass(1, samp_rate, 2.4e3, 240)
+    type: ccc
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [472, 480.0]
+    rotation: 0
+    state: enabled
+- name: import_0
+  id: import
+  parameters:
+    alias: ''
+    comment: ''
+    imports: import numpy as np
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [248, 8.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_const_sink_x_0
+  id: qtgui_const_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'True'
+    axislabels: 'True'
+    color1: '"blue"'
+    color10: '"dark blue"'
+    color2: '"red"'
+    color3: '"green"'
+    color4: '"black"'
+    color5: '"cyan"'
+    color6: '"magenta"'
+    color7: '"yellow"'
+    color8: '"dark red"'
+    color9: '"dark green"'
+    comment: ''
+    grid: 'False'
+    gui_hint: ''
+    label1: ''
+    label10: ''
+    label2: ''
+    label3: ''
+    label4: ''
+    label5: ''
+    label6: ''
+    label7: ''
+    label8: ''
+    label9: ''
+    legend: 'True'
+    marker1: '0'
+    marker10: '0'
+    marker2: '0'
+    marker3: '0'
+    marker4: '0'
+    marker5: '0'
+    marker6: '0'
+    marker7: '0'
+    marker8: '0'
+    marker9: '0'
+    name: '"After Symbol Sync"'
+    nconnections: '1'
+    size: '1024'
+    style1: '0'
+    style10: '0'
+    style2: '0'
+    style3: '0'
+    style4: '0'
+    style5: '0'
+    style6: '0'
+    style7: '0'
+    style8: '0'
+    style9: '0'
+    tr_chan: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: complex
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    xmax: '2'
+    xmin: '-2'
+    ymax: '2'
+    ymin: '-2'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1568, 432.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_freq_sink_x_0
+  id: qtgui_freq_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'False'
+    average: '0.1'
+    axislabels: 'True'
+    bw: samp_rate
+    color1: '"blue"'
+    color10: '"dark blue"'
+    color2: '"red"'
+    color3: '"green"'
+    color4: '"black"'
+    color5: '"cyan"'
+    color6: '"magenta"'
+    color7: '"yellow"'
+    color8: '"dark red"'
+    color9: '"dark green"'
+    comment: ''
+    ctrlpanel: 'False'
+    fc: '0'
+    fftsize: '4096'
+    freqhalf: 'True'
+    grid: 'True'
+    gui_hint: ''
+    label: Relative Gain
+    label1: ''
+    label10: ''''''
+    label2: ''''''
+    label3: ''''''
+    label4: ''''''
+    label5: ''''''
+    label6: ''''''
+    label7: ''''''
+    label8: ''''''
+    label9: ''''''
+    legend: 'True'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    name: '""'
+    nconnections: '1'
+    norm_window: 'False'
+    showports: 'False'
+    tr_chan: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_tag: '""'
+    type: complex
+    units: dB
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    wintype: window.WIN_BLACKMAN_hARRIS
+    ymax: '10'
+    ymin: '-140'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [944, 256.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_time_sink_x_0_0_0
+  id: qtgui_time_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'True'
+    axislabels: 'True'
+    color1: blue
+    color10: dark blue
+    color2: red
+    color3: green
+    color4: black
+    color5: cyan
+    color6: magenta
+    color7: yellow
+    color8: dark red
+    color9: dark green
+    comment: ''
+    ctrlpanel: 'False'
+    entags: 'True'
+    grid: 'False'
+    gui_hint: ''
+    label1: Signal 1
+    label10: Signal 10
+    label2: Signal 2
+    label3: Signal 3
+    label4: Signal 4
+    label5: Signal 5
+    label6: Signal 6
+    label7: Signal 7
+    label8: Signal 8
+    label9: Signal 9
+    legend: 'True'
+    marker1: '0'
+    marker10: '-1'
+    marker2: '-1'
+    marker3: '-1'
+    marker4: '-1'
+    marker5: '-1'
+    marker6: '-1'
+    marker7: '-1'
+    marker8: '-1'
+    marker9: '-1'
+    name: '"After DBPSK demod chain"'
+    nconnections: '1'
+    size: '5000'
+    srate: '1200'
+    stemplot: 'False'
+    style1: '0'
+    style10: '1'
+    style2: '1'
+    style3: '1'
+    style4: '1'
+    style5: '1'
+    style6: '1'
+    style7: '1'
+    style8: '1'
+    style9: '1'
+    tr_chan: '0'
+    tr_delay: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: float
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    ylabel: Amplitude
+    ymax: '4'
+    ymin: '-4'
+    yunit: '""'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1208, 720.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_time_sink_x_1_0
+  id: qtgui_time_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'True'
+    axislabels: 'True'
+    color1: blue
+    color10: dark blue
+    color2: red
+    color3: green
+    color4: black
+    color5: cyan
+    color6: magenta
+    color7: yellow
+    color8: dark red
+    color9: dark green
+    comment: ''
+    ctrlpanel: 'False'
+    entags: 'True'
+    grid: 'False'
+    gui_hint: ''
+    label1: real
+    label10: Signal 10
+    label2: Q
+    label3: Signal 3
+    label4: Signal 4
+    label5: Signal 5
+    label6: Signal 6
+    label7: Signal 7
+    label8: Signal 8
+    label9: Signal 9
+    legend: 'True'
+    marker1: '-1'
+    marker10: '-1'
+    marker2: '-1'
+    marker3: '-1'
+    marker4: '-1'
+    marker5: '-1'
+    marker6: '-1'
+    marker7: '-1'
+    marker8: '-1'
+    marker9: '-1'
+    name: '"After Symbol Sync"'
+    nconnections: '1'
+    size: '1024'
+    srate: 7.2e3
+    stemplot: 'False'
+    style1: '1'
+    style10: '1'
+    style2: '1'
+    style3: '1'
+    style4: '1'
+    style5: '1'
+    style6: '1'
+    style7: '1'
+    style8: '1'
+    style9: '1'
+    tr_chan: '0'
+    tr_delay: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: complex
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    ylabel: Amplitude
+    ymax: '1'
+    ymin: '-1'
+    yunit: '""'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1576, 520.0]
+    rotation: 0
+    state: enabled
+- name: qtgui_time_sink_x_1_0_0
+  id: qtgui_time_sink_x
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha1: '1.0'
+    alpha10: '1.0'
+    alpha2: '1.0'
+    alpha3: '1.0'
+    alpha4: '1.0'
+    alpha5: '1.0'
+    alpha6: '1.0'
+    alpha7: '1.0'
+    alpha8: '1.0'
+    alpha9: '1.0'
+    autoscale: 'True'
+    axislabels: 'True'
+    color1: blue
+    color10: dark blue
+    color2: red
+    color3: green
+    color4: black
+    color5: cyan
+    color6: magenta
+    color7: yellow
+    color8: dark red
+    color9: dark green
+    comment: ''
+    ctrlpanel: 'False'
+    entags: 'True'
+    grid: 'False'
+    gui_hint: ''
+    label1: real
+    label10: Signal 10
+    label2: Q
+    label3: Signal 3
+    label4: Signal 4
+    label5: Signal 5
+    label6: Signal 6
+    label7: Signal 7
+    label8: Signal 8
+    label9: Signal 9
+    legend: 'True'
+    marker1: '-1'
+    marker10: '-1'
+    marker2: '-1'
+    marker3: '-1'
+    marker4: '-1'
+    marker5: '-1'
+    marker6: '-1'
+    marker7: '-1'
+    marker8: '-1'
+    marker9: '-1'
+    name: '"After FLL"'
+    nconnections: '1'
+    size: '1024'
+    srate: samp_rate
+    stemplot: 'False'
+    style1: '1'
+    style10: '1'
+    style2: '1'
+    style3: '1'
+    style4: '1'
+    style5: '1'
+    style6: '1'
+    style7: '1'
+    style8: '1'
+    style9: '1'
+    tr_chan: '0'
+    tr_delay: '0'
+    tr_level: '0.0'
+    tr_mode: qtgui.TRIG_MODE_FREE
+    tr_slope: qtgui.TRIG_SLOPE_POS
+    tr_tag: '""'
+    type: complex
+    update_time: '0.10'
+    width1: '1'
+    width10: '1'
+    width2: '1'
+    width3: '1'
+    width4: '1'
+    width5: '1'
+    width6: '1'
+    width7: '1'
+    width8: '1'
+    width9: '1'
+    ylabel: Amplitude
+    ymax: '1'
+    ymin: '-1'
+    yunit: '""'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1144, 408.0]
+    rotation: 0
+    state: enabled
+- name: satellites_ao40_fec_deframer_1
+  id: satellites_ao40_fec_deframer
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    crc: 'False'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    options: '""'
+    short_frames: 'False'
+    threshold: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [2992, 776.0]
+    rotation: 0
+    state: disabled
+- name: satellites_ccsds_descrambler_0
+  id: satellites_ccsds_descrambler
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1312, 888.0]
+    rotation: 0
+    state: enabled
+- name: satellites_decode_rs_ccsds_0
+  id: satellites_decode_rs_ccsds
+  parameters:
+    affinity: ''
+    alias: ''
+    basis: 'False'
+    comment: ''
+    interleave: '2'
+    maxoutbuf: '0'
+    minoutbuf: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1496, 872.0]
+    rotation: 0
+    state: enabled
+- name: satellites_distributed_syncframe_soft_0
+  id: satellites_distributed_syncframe_soft
+  parameters:
+    affinity: ''
+    alias: ''
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    step: '80'
+    syncword: '11111110000111011110010110010010000001000100110001011101011011000'
+    threshold: '0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [480, 856.0]
+    rotation: 0
+    state: enabled
+- name: satellites_matrix_deinterleaver_soft_0
+  id: satellites_matrix_deinterleaver_soft
+  parameters:
+    affinity: ''
+    alias: ''
+    cols: '65'
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    output_size: '5132'
+    output_skip: '65'
+    rows: '80'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [816, 848.0]
+    rotation: 0
+    state: enabled
+- name: satellites_rms_agc_1
+  id: satellites_rms_agc
+  parameters:
+    affinity: ''
+    alias: ''
+    alpha: '0.002'
+    comment: ''
+    maxoutbuf: '0'
+    minoutbuf: '0'
+    reference: '1.0'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [712, 496.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_0
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"Throttle"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [944, 344.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_1
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"Symbol_out"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1584, 352.0]
+    rotation: 0
+    state: enabled
+- name: virtual_sink_2
+  id: virtual_sink
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"real_out"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [1056, 784.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_0
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"Throttle"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [272, 488.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_1
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"Symbol_out"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [272, 728.0]
+    rotation: 0
+    state: enabled
+- name: virtual_source_2
+  id: virtual_source
+  parameters:
+    alias: ''
+    comment: ''
+    stream_id: '"real_out"'
+  states:
+    bus_sink: false
+    bus_source: false
+    bus_structure: null
+    coordinate: [256, 872.0]
+    rotation: 0
+    state: enabled
+
+connections:
+- [blocks_float_to_complex_0, '0', blocks_throttle2_0, '0']
+- [blocks_throttle2_0, '0', qtgui_freq_sink_x_0, '0']
+- [blocks_throttle2_0, '0', virtual_sink_0, '0']
+- [blocks_wavfile_source_0, '0', blocks_float_to_complex_0, '0']
+- [blocks_wavfile_source_0, '1', blocks_float_to_complex_0, '1']
+- [digital_fll_band_edge_cc_0, '0', digital_symbol_sync_xx_0, '0']
+- [digital_fll_band_edge_cc_0, '0', qtgui_time_sink_x_1_0_0, '0']
+- [digital_symbol_sync_xx_0, '0', qtgui_const_sink_x_0, '0']
+- [digital_symbol_sync_xx_0, '0', qtgui_time_sink_x_1_0, '0']
+- [digital_symbol_sync_xx_0, '0', virtual_sink_1, '0']
+- [epy_block_0, out, satellites_ccsds_descrambler_0, in]
+- [epy_block_1, '0', qtgui_time_sink_x_0_0_0, '0']
+- [epy_block_1, '0', virtual_sink_2, '0']
+- [freq_xlating_fir_filter_xxx_0_0, '0', satellites_rms_agc_1, '0']
+- [satellites_ao40_fec_deframer_1, out, blocks_message_debug_1, print]
+- [satellites_ccsds_descrambler_0, out, satellites_decode_rs_ccsds_0, in]
+- [satellites_decode_rs_ccsds_0, out, blocks_message_debug_1_0, print]
+- [satellites_distributed_syncframe_soft_0, out, satellites_matrix_deinterleaver_soft_0,
+  in]
+- [satellites_matrix_deinterleaver_soft_0, out, epy_block_0, in]
+- [satellites_rms_agc_1, '0', digital_fll_band_edge_cc_0, '0']
+- [virtual_source_0, '0', freq_xlating_fir_filter_xxx_0_0, '0']
+- [virtual_source_1, '0', epy_block_1, '0']
+- [virtual_source_2, '0', satellites_distributed_syncframe_soft_0, '0']
+
+metadata:
+  file_format: 1
+  grc_version: 3.10.12.0

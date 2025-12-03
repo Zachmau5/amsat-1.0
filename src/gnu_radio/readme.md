@@ -15,7 +15,7 @@ gnu_radio/
 ├── weakIQ.grc
 └── weakIQ.py
 
-📡 Overview
+Overview
 
 The GNU Radio tools here were used to:
 Demodulate NBFM from the ISS
@@ -25,7 +25,7 @@ Test CCSDS K=7 convolutional code decoding
 Process weak IQ recordings for offline signal recovery
 Extract and parse AO-73 (FUNcube-1) telemetry frames
 
-📘 File Descriptions
+File Descriptions
 ao73.wav
 Raw IQ recording (complex baseband) used to test the BPSK/DBPSK demodulation chain.
 
